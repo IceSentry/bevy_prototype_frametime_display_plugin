@@ -4,10 +4,13 @@ use bevy::{
     math::vec2,
     prelude::*,
     sprite::{Material2dPlugin, MaterialMesh2dBundle},
+    window::WindowResized,
 };
 
 // TODO make this configurable
 const FRAMETIME_LEN: usize = 200;
+const DISPLAY_WIDTH: f32 = 400.0;
+const DISPLAY_HEIGHT: f32 = 100.0;
 
 pub struct FrametimeDisplayPlugin;
 
@@ -16,9 +19,13 @@ impl Plugin for FrametimeDisplayPlugin {
         app.add_plugin(FrameTimeDiagnosticsPlugin::default())
             .add_plugin(Material2dPlugin::<FrametimeMaterial>::default())
             .add_startup_system(setup)
-            .add_system(update_frametimes);
+            .add_system(update_frametimes)
+            .add_system(resize);
     }
 }
+
+#[derive(Component)]
+struct FrametimeDisplay;
 
 fn setup(
     mut commands: Commands,
@@ -27,21 +34,33 @@ fn setup(
     windows: Res<Windows>,
 ) {
     let window = windows.get_primary().expect("failed to get window");
-    let width = 400.0;
-    let height = 100.0;
-    commands.spawn().insert_bundle(MaterialMesh2dBundle {
-        mesh: meshes
-            .add(shape::Quad::new(vec2(width, height)).into())
-            .into(),
-        // TODO move to corner and handle resizing
-        transform: Transform::from_xyz(
-            (window.width() / 2.0) - (width / 2.0),
-            (window.height() / 2.0) - (height / 2.0),
-            500.0,
-        ),
-        material: f_materials.add(FrametimeMaterial::default()),
-        ..default()
-    });
+    commands
+        .spawn()
+        .insert_bundle(MaterialMesh2dBundle {
+            mesh: meshes
+                .add(shape::Quad::new(vec2(DISPLAY_WIDTH, DISPLAY_HEIGHT)).into())
+                .into(),
+            transform: Transform::from_xyz(
+                (window.width() / 2.0) - (DISPLAY_WIDTH / 2.0),
+                (window.height() / 2.0) - (DISPLAY_HEIGHT / 2.0),
+                500.0,
+            ),
+            material: f_materials.add(FrametimeMaterial::default()),
+            ..default()
+        })
+        .insert(FrametimeDisplay);
+}
+
+fn resize(
+    mut resize_events: EventReader<WindowResized>,
+    mut query: Query<&mut Transform, With<FrametimeDisplay>>,
+) {
+    for ev in resize_events.iter() {
+        for mut transform in query.iter_mut() {
+            transform.translation.x = (ev.width / 2.0) - (DISPLAY_WIDTH / 2.0);
+            transform.translation.y = (ev.height / 2.0) - (DISPLAY_HEIGHT / 2.0);
+        }
+    }
 }
 
 fn update_frametimes(
