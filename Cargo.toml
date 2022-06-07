@@ -4,4 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { git = "https://github.com/bevyengine/bevy" }
+bevy = { git = "https://github.com/bevyengine/bevy", branch = "main" }
+
+[features]
+default = ["2d"]
+2d = []
+3d = []
