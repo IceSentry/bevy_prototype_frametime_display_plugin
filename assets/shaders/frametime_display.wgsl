@@ -6,6 +6,8 @@ struct FrametimeMaterial {
     dt_max_log2: f32;
     max_width: f32;
     len: i32;
+    colors: array<vec4<f32>, 4>;
+    dts: array<f32, 4>;
     frametimes: array<f32>;
 };
 [[group(1), binding(0)]]
@@ -27,7 +29,19 @@ fn sdf_square(pos: vec2<f32>, half_size: vec2<f32>, offset: vec2<f32>) -> f32 {
 }
 
 fn color_from_dt(dt: f32) -> vec4<f32> {
-    return mix(vec4<f32>(0., 255., 0., 1.), vec4<f32>(255., 0., 0., 1.), dt / 10.0);
+    let count = 4;
+
+    if (dt < material.dts[0]) {
+        return material.colors[0];
+    }
+
+    for (var i = 0; i < count; i = i + 1) {
+        if (dt < material.dts[i]) {
+            let t = (dt - material.dts[i - 1]) / (material.dts[i] - material.dts[i - 1]);
+            return mix(material.colors[i - 1], material.colors[i], t);
+        }
+    }
+    return material.colors[count - 1];
 }
 
 [[stage(fragment)]]

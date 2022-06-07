@@ -14,19 +14,23 @@ use bevy::{
     sprite::{Material2d, Material2dPipeline},
 };
 const FRAMETIME_LEN: usize = 200;
-const DT_MIN: f32 = 1. / 240.;
+const DT_MIN: f32 = 1. / 144.;
 const DT_MAX: f32 = 1. / 15.;
+// WARN this is hardcoded in the shader
+const COLORS_COUNT: usize = 4;
 
 #[derive(Debug, Clone, TypeUuid, ShaderType)]
 #[uuid = "f690fdae-d598-45ab-8225-97e2a3f056e0"]
 pub struct FrametimeMaterial {
-    pub dt_min: f32,
-    pub dt_max: f32,
-    pub dt_min_log2: f32,
-    pub dt_max_log2: f32,
-    pub max_width: f32,
-    pub len: i32,
-    pub frametimes: [f32; FRAMETIME_LEN],
+    dt_min: f32,
+    dt_max: f32,
+    dt_min_log2: f32,
+    dt_max_log2: f32,
+    max_width: f32,
+    len: i32,
+    colors: [Vec4; COLORS_COUNT],
+    dts: [f32; COLORS_COUNT],
+    pub(crate) frametimes: [f32; FRAMETIME_LEN],
 }
 
 impl Default for FrametimeMaterial {
@@ -39,6 +43,19 @@ impl Default for FrametimeMaterial {
             // There's probably a better value for this
             max_width: FRAMETIME_LEN as f32,
             len: FRAMETIME_LEN as i32,
+            colors: [
+                Vec4::from_slice(&Color::BLUE.as_linear_rgba_f32()),
+                Vec4::from_slice(&Color::GREEN.as_linear_rgba_f32()),
+                Vec4::from_slice(&Color::YELLOW.as_linear_rgba_f32()),
+                Vec4::from_slice(&Color::RED.as_linear_rgba_f32()),
+            ],
+            #[rustfmt::skip]
+            dts: [
+                DT_MIN,
+                1. / 60.,
+                1. / 30.,
+                DT_MAX,
+            ],
             frametimes: [0.0; FRAMETIME_LEN],
         }
     }
@@ -54,6 +71,7 @@ impl RenderAsset for FrametimeMaterial {
     type ExtractedAsset = FrametimeMaterial;
     type PreparedAsset = GpuFrametimeMaterial;
     type Param = (SRes<RenderDevice>, SRes<Material2dPipeline<Self>>);
+
     fn extract_asset(&self) -> Self::ExtractedAsset {
         self.clone()
     }
