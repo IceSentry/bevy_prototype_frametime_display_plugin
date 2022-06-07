@@ -18,6 +18,8 @@ use bevy::{
 };
 
 const FRAMETIME_LEN: usize = 240;
+const DT_MIN: f32 = 1. / 144.;
+const DT_MAX: f32 = 1. / 15.;
 
 fn main() {
     App::new()
@@ -38,38 +40,19 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<FrametimeMaterial>>,
 ) {
-    // let dt_min = 0.006944; // 144 hz
-    let dt_min = 0.004167; // 240 hz
-    let dt_max = 0.066667; // 15 hz
-    let max_width = FRAMETIME_LEN as f32;
-
-    // 144, 120, 60, 15 fps
-    let frametimes = [0.006, 0.008, 0.016, 0.06];
-    let mut total_width = 0.0;
-    for dt in frametimes {
-        let frame_width = dt / dt_min;
-        info!(
-            "{dt:.3} {total_width:.4} {:.4} {:.4}",
-            frame_width,
-            frame_width / max_width
-        );
-        total_width += frame_width / max_width;
-    }
-    info!("total_width {total_width}");
-
-    // quad
     // TODO attach it to camera and display on top
+    // maybe use a 2d material instead?
     commands.spawn().insert_bundle(MaterialMeshBundle {
         mesh: meshes.add(Mesh::from(shape::Quad::new(vec2(4.0, 4.0)))),
         transform: Transform::from_xyz(0.0, 0.0, 0.0),
         material: materials.add(FrametimeMaterial {
-            dt_min,
-            dt_max,
-            dt_min_log2: dt_min.log2(),
-            dt_max_log2: dt_max.log2(),
-            max_width,
+            dt_min: DT_MIN,
+            dt_max: DT_MAX,
+            dt_min_log2: DT_MIN.log2(),
+            dt_max_log2: DT_MAX.log2(),
+            // There's probably a better value for this
+            max_width: FRAMETIME_LEN as f32,
             len: FRAMETIME_LEN as i32,
-            // frametimes,
             frametimes: [0.0; FRAMETIME_LEN],
         }),
         ..default()
@@ -88,17 +71,8 @@ fn update_frametimes(
     mut materials_query: Query<&Handle<FrametimeMaterial>>,
 ) {
     if let Some(frame_time_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::FRAME_TIME) {
-        // let mut frametimes = [0.0; FRAMETIME_LEN];
-        // for (i, value) in frame_time_diagnostic
-        //     .values()
-        //     .take(FRAMETIME_LEN)
-        //     .enumerate()
-        // {
-        //     frametimes[i] = *value as f32;
-        // }
         for material_handle in &mut materials_query {
             if let Some(material) = materials.get_mut(material_handle) {
-                // material.frametimes = frametimes;
                 material.frametimes.rotate_left(1);
                 let dt = frame_time_diagnostic.value();
                 material.frametimes[FRAMETIME_LEN - 1] = dt.unwrap_or(0.0) as f32;
