@@ -14,7 +14,7 @@ use bevy::{
     sprite::{Material2d, Material2dPipeline},
 };
 const FRAMETIME_LEN: usize = 200;
-const DT_MIN: f32 = 1. / 144.;
+const DT_MIN: f32 = 1. / 240.;
 const DT_MAX: f32 = 1. / 15.;
 // WARN this is hardcoded in the shader
 const COLORS_COUNT: usize = 4;
