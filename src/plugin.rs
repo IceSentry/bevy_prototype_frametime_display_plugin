@@ -24,13 +24,21 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut f_materials: ResMut<Assets<FrametimeMaterial>>,
+    windows: Res<Windows>,
 ) {
+    let window = windows.get_primary().expect("failed to get window");
+    let width = 400.0;
+    let height = 100.0;
     commands.spawn().insert_bundle(MaterialMesh2dBundle {
         mesh: meshes
-            .add(shape::Quad::new(vec2(400.0, 100.0)).into())
+            .add(shape::Quad::new(vec2(width, height)).into())
             .into(),
         // TODO move to corner and handle resizing
-        transform: Transform::from_xyz(0.0, 0.0, 500.0),
+        transform: Transform::from_xyz(
+            (window.width() / 2.0) - (width / 2.0),
+            (window.height() / 2.0) - (height / 2.0),
+            500.0,
+        ),
         material: f_materials.add(FrametimeMaterial::default()),
         ..default()
     });

@@ -18,7 +18,7 @@ struct VertexOutput {
     [[location(2)]] uv: vec2<f32>;
 };
 
-fn square(pos: vec2<f32>, half_size: vec2<f32>, offset: vec2<f32>) -> f32 {
+fn sdf_square(pos: vec2<f32>, half_size: vec2<f32>, offset: vec2<f32>) -> f32 {
     let p = pos - offset;
     let dist = abs(p) - half_size;
     let outside_dist = length(max(dist, vec2<f32>(0.0, 0.0)));
@@ -26,8 +26,8 @@ fn square(pos: vec2<f32>, half_size: vec2<f32>, offset: vec2<f32>) -> f32 {
     return outside_dist + inside_dist;
 }
 
-fn circle(pos: vec2<f32>, radius: f32) -> f32 {
-    return length(pos) - radius;
+fn color_from_dt(dt: f32) -> vec4<f32> {
+    return mix(vec4<f32>(0., 255., 0., 1.), vec4<f32>(255., 0., 0., 1.), dt / 10.0);
 }
 
 [[stage(fragment)]]
@@ -50,16 +50,15 @@ fn fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
         let frame_height_factor_norm = min(max(0.0, frame_height_factor), 1.0);
         let frame_height = mix(0.0, 1.0, frame_height_factor_norm);
 
-        // TODO improve color
-        let dt_color = mix(vec4<f32>(0., 255., 0., 1.), vec4<f32>(255., 0., 0., 1.), dt / 10.0);
-
-        if (square(pos, vec2<f32>(frame_width / 2.0, frame_height), vec2<f32>(width + frame_width / 2., 1.)) < 0.0) {
-            return dt_color;
+        if (sdf_square(pos, vec2<f32>(frame_width / 2.0, frame_height), vec2<f32>(width + frame_width / 2., 1.)) < 0.0) {
+            return color_from_dt(dt);
         }
+
         width = width + frame_width;
     }
 
     return vec4<f32>(0.0, 0.0, 0.0, 0.25);
 }
+
 
 
