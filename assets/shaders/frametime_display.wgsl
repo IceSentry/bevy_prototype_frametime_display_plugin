@@ -50,6 +50,7 @@ fn color_from_dt(dt: f32) -> vec4<f32> {
     return config.colors[COLORS_COUNTS - 1];
 }
 
+
 [[stage(fragment)]]
 fn fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     let dt_min = config.dt_min;
@@ -60,6 +61,9 @@ fn fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
     let max_width = config.max_width;
 
     var pos = in.uv.xy;
+
+    // The general alogrithm is highly inspired by
+    // <https://github.com/sawickiap/RegEngine/blob/613c31fd60558a75c5b8902529acfa425fc97b2a/Source/Game.cpp#L331>
 
     var width = 0.0;
     for (var i = 0; i <= config.len; i = i + 1) {
@@ -80,6 +84,3 @@ fn fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
 
     return vec4<f32>(0.0, 0.0, 0.0, 0.25);
 }
-
-
-
