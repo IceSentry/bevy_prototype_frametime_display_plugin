@@ -1,17 +1,25 @@
+var<private> COLORS_COUNTS: i32 = 4;
 
-struct FrametimeMaterial {
+struct Config {
     dt_min: f32;
     dt_max: f32;
     dt_min_log2: f32;
     dt_max_log2: f32;
     max_width: f32;
     len: i32;
-    colors: array<vec4<f32>, 4>;
-    dts: array<f32, 4>;
-    frametimes: array<f32>;
+    colors: mat4x4<f32>;
+    dts: vec4<f32>;
 };
+
 [[group(1), binding(0)]]
-var<storage> material: FrametimeMaterial;
+var<uniform> config: Config;
+
+struct Frametimes {
+    values: array<f32>;
+};
+
+[[group(1), binding(1)]]
+var<storage> frametimes: Frametimes;
 
 struct VertexOutput {
     [[builtin(position)]] clip_position: vec4<f32>;
@@ -29,34 +37,33 @@ fn sdf_square(pos: vec2<f32>, half_size: vec2<f32>, offset: vec2<f32>) -> f32 {
 }
 
 fn color_from_dt(dt: f32) -> vec4<f32> {
-    let count = 4;
-
-    if (dt < material.dts[0]) {
-        return material.colors[0];
+    if (dt < config.dts[0]) {
+        return config.colors[0];
     }
 
-    for (var i = 0; i < count; i = i + 1) {
-        if (dt < material.dts[i]) {
-            let t = (dt - material.dts[i - 1]) / (material.dts[i] - material.dts[i - 1]);
-            return mix(material.colors[i - 1], material.colors[i], t);
+    for (var i = 0; i < COLORS_COUNTS; i = i + 1) {
+        if (dt < config.dts[i]) {
+            let t = (dt - config.dts[i - 1]) / (config.dts[i] - config.dts[i - 1]);
+            return mix(config.colors[i - 1], config.colors[i], t);
         }
     }
-    return material.colors[count - 1];
+    return config.colors[COLORS_COUNTS - 1];
 }
 
 [[stage(fragment)]]
 fn fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
-    let dt_min = material.dt_min;
-    let dt_max = material.dt_max;
-    let max_width = material.max_width;
-    let dt_min_log2 = material.dt_min_log2;
-    let dt_max_log2 = material.dt_max_log2;
+    let dt_min = config.dt_min;
+    let dt_max = config.dt_max;
+    let dt_min_log2 = config.dt_min_log2;
+    let dt_max_log2 = config.dt_max_log2;
+
+    let max_width = config.max_width;
 
     var pos = in.uv.xy;
 
     var width = 0.0;
-    for (var i = 0; i <= material.len; i = i + 1) {
-        let dt = material.frametimes[i];
+    for (var i = 0; i <= config.len; i = i + 1) {
+        let dt = frametimes.values[i];
         let frame_width = (dt / dt_min);
         let frame_width = frame_width / max_width;
 

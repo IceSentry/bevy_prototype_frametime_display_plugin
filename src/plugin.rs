@@ -71,9 +71,9 @@ fn update_frametimes(
     if let Some(frame_time_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::FRAME_TIME) {
         for material_handle in &mut materials_query {
             if let Some(material) = materials.get_mut(material_handle) {
-                material.frametimes.rotate_left(1);
+                material.frametimes.values.rotate_left(1);
                 let dt = frame_time_diagnostic.value();
-                material.frametimes[FRAMETIME_LEN - 1] = dt.unwrap_or(0.0) as f32;
+                material.frametimes.values[FRAMETIME_LEN - 1] = dt.unwrap_or(0.0) as f32;
             }
         }
     }
