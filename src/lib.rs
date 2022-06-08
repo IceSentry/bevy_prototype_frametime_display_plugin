@@ -1,3 +1,5 @@
+mod material;
+
 use crate::material::FrametimeMaterial;
 use bevy::{
     diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
