@@ -13,15 +13,17 @@ use bevy::{
     },
     sprite::{Material2d, Material2dPipeline},
 };
-const FRAMETIME_LEN: usize = 200;
-const DT_MIN: f32 = 1. / 240.;
-const DT_MAX: f32 = 1. / 15.;
+
+use crate::FRAMETIME_BUFFER_LEN;
+
+const DEFAULT_DT_MIN: f32 = 1. / 240.;
+const DEFAULT_DT_MAX: f32 = 1. / 15.;
 
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "f690fdae-d598-45ab-8225-97e2a3f056e0"]
 pub struct FrametimeMaterial {
-    config: FrametimeConfig,
-    pub(crate) frametimes: Frametimes,
+    pub config: FrametimeConfig,
+    pub frametimes: Frametimes,
 }
 
 impl Default for FrametimeMaterial {
@@ -40,40 +42,47 @@ impl Default for FrametimeMaterial {
 }
 
 #[derive(Debug, Clone, ShaderType)]
-pub(crate) struct Frametimes {
-    pub(crate) values: [f32; FRAMETIME_LEN],
+pub struct Frametimes {
+    pub values: [f32; FRAMETIME_BUFFER_LEN],
 }
 
 impl Default for Frametimes {
     fn default() -> Self {
         Self {
-            values: [0.0; FRAMETIME_LEN],
+            values: [0.0; FRAMETIME_BUFFER_LEN],
         }
     }
 }
 
+impl Frametimes {
+    pub fn push(&mut self, value: f32) {
+        self.values.rotate_left(1);
+        self.values[FRAMETIME_BUFFER_LEN - 1] = value;
+    }
+}
+
 #[derive(Debug, Clone, ShaderType)]
-struct FrametimeConfig {
-    dt_min: f32,
-    dt_max: f32,
-    dt_min_log2: f32,
-    dt_max_log2: f32,
-    max_width: f32,
-    len: i32,
-    colors: Mat4,
-    dts: Vec4,
+pub struct FrametimeConfig {
+    pub dt_min: f32,
+    pub dt_max: f32,
+    pub dt_min_log2: f32,
+    pub dt_max_log2: f32,
+    pub max_width: f32,
+    pub len: i32,
+    pub colors: Mat4,
+    pub dts: Vec4,
 }
 
 impl Default for FrametimeConfig {
     fn default() -> Self {
         Self {
-            dt_min: DT_MIN,
-            dt_max: DT_MAX,
-            dt_min_log2: DT_MIN.log2(),
-            dt_max_log2: DT_MAX.log2(),
+            dt_min: DEFAULT_DT_MIN,
+            dt_max: DEFAULT_DT_MAX,
+            dt_min_log2: DEFAULT_DT_MIN.log2(),
+            dt_max_log2: DEFAULT_DT_MAX.log2(),
             // There's probably a better value for this
-            max_width: FRAMETIME_LEN as f32,
-            len: FRAMETIME_LEN as i32,
+            max_width: FRAMETIME_BUFFER_LEN as f32,
+            len: FRAMETIME_BUFFER_LEN as i32,
             colors: Mat4::from_cols_array_2d(&[
                 Color::BLUE.as_linear_rgba_f32(),
                 Color::GREEN.as_linear_rgba_f32(),
@@ -82,10 +91,10 @@ impl Default for FrametimeConfig {
             ]),
             #[rustfmt::skip]
             dts: Vec4::new(
-                DT_MIN,
+                DEFAULT_DT_MIN,
                 1. / 60.,
                 1. / 30.,
-                DT_MAX,
+                DEFAULT_DT_MAX,
             ),
         }
     }
