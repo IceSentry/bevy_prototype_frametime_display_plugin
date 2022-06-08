@@ -13,7 +13,12 @@ use material::FrametimeConfig;
 /// The amount of frametimes kept in the buffer to be rendered in the display
 /// Since the bars aren't all of the same size, this is the maximum value possible
 // TODO make this configurable
-const FRAMETIME_BUFFER_LEN: usize = 100;
+const FRAMETIME_BUFFER_LEN: usize = 150;
+
+/// The layer used to render the display
+/// Set to a high number to make sure it renders on top
+// TODO maybe make this configurable?
+const Z_LAYER: f32 = 500.0;
 
 pub struct FrametimeDisplayDescriptor {
     /// The width of the display in pixels
@@ -83,12 +88,12 @@ fn setup(
                 .into(),
             transform: match desc.position {
                 Position::TopLeft => {
-                    Transform::from_xyz(0.0, (window.height() / 2.0) - (desc.height / 2.0), 500.0)
+                    Transform::from_xyz(0.0, (window.height() / 2.0) - (desc.height / 2.0), Z_LAYER)
                 }
                 Position::TopRight => Transform::from_xyz(
                     (window.width() / 2.0) - (desc.width / 2.0),
                     (window.height() / 2.0) - (desc.height / 2.0),
-                    500.0,
+                    Z_LAYER,
                 ),
             },
             material: f_materials.add(FrametimeMaterial {

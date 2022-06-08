@@ -1,5 +1,7 @@
 use bevy::{asset::AssetServerSettings, prelude::*};
-use bevy_prototype_frametime_display_plugin::{FrametimeDisplayDescriptor, FrametimeDisplayPlugin};
+use bevy_prototype_frametime_display_plugin::{
+    FrametimeDisplayDescriptor, FrametimeDisplayPlugin, Position,
+};
 
 fn main() {
     App::new()
@@ -11,8 +13,9 @@ fn main() {
         // If you need to configure it, simply insert a FrametimeDisplayDescriptor
         // and change any config
         .insert_resource(FrametimeDisplayDescriptor {
-            width: 400.0,
-            height: 100.0,
+            width: 200.0,
+            height: 50.0,
+            position: Position::TopRight,
             ..default()
         })
         // Insert the plugin on the app
