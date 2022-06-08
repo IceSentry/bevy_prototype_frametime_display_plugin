@@ -30,6 +30,13 @@ pub struct FrametimeDisplayDescriptor {
     ///
     /// Defaults to `1. / 15.` or 15 fps
     pub dt_max: f32,
+    /// The position of the display
+    pub position: Position,
+}
+
+pub enum Position {
+    TopLeft,
+    TopRight,
 }
 
 impl Default for FrametimeDisplayDescriptor {
@@ -39,6 +46,7 @@ impl Default for FrametimeDisplayDescriptor {
             height: 100.,
             dt_min: 1. / 240.,
             dt_max: 1. / 15.,
+            position: Position::TopLeft,
         }
     }
 }
@@ -73,11 +81,16 @@ fn setup(
             mesh: meshes
                 .add(shape::Quad::new(vec2(desc.width, desc.height)).into())
                 .into(),
-            transform: Transform::from_xyz(
-                (window.width() / 2.0) - (desc.width / 2.0),
-                (window.height() / 2.0) - (desc.height / 2.0),
-                500.0,
-            ),
+            transform: match desc.position {
+                Position::TopLeft => {
+                    Transform::from_xyz(0.0, (window.height() / 2.0) - (desc.height / 2.0), 500.0)
+                }
+                Position::TopRight => Transform::from_xyz(
+                    (window.width() / 2.0) - (desc.width / 2.0),
+                    (window.height() / 2.0) - (desc.height / 2.0),
+                    500.0,
+                ),
+            },
             material: f_materials.add(FrametimeMaterial {
                 config: FrametimeConfig {
                     dt_min: desc.dt_min,
@@ -100,7 +113,10 @@ fn resize(
 ) {
     for ev in resize_events.iter() {
         for mut transform in query.iter_mut() {
-            transform.translation.x = (ev.width / 2.0) - (desc.width / 2.0);
+            transform.translation.x = match desc.position {
+                Position::TopLeft => -(ev.width / 2.0) + (desc.width / 2.0),
+                Position::TopRight => (ev.width / 2.0) - (desc.width / 2.0),
+            };
             transform.translation.y = (ev.height / 2.0) - (desc.height / 2.0);
         }
     }
