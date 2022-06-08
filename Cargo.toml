@@ -9,9 +9,9 @@ readme = "README.md"
 edition = "2021"
 
 [dependencies]
-bevy = { git = "https://github.com/bevyengine/bevy", branch = "main" }
+bevy = { git = "https://github.com/bevyengine/bevy", rev = "f28b92120920f387020f3b3e858f0e7039b9c07e", version = "0.8.0-dev", default-features = false, features = [
+    "render",
+] }
 
-[features]
-default = ["2d"]
-2d = []
-3d = []
+[dev-dependencies]
+bevy = { git = "https://github.com/bevyengine/bevy", rev = "f28b92120920f387020f3b3e858f0e7039b9c07e" }
