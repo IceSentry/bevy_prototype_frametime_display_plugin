@@ -1,6 +1,11 @@
 [package]
 name = "bevy_prototype_frametime_display_plugin"
 version = "0.1.0"
+license-file = "LICENSE"
+description = "A plugin to show the frametimes in a bevy app"
+homepage = "https://github.com/IceSentry/bevy_prototype_frametime_display_plugin"
+repository = "https://github.com/IceSentry/bevy_prototype_frametime_display_plugin"
+readme = "README.md"
 edition = "2021"
 
 [dependencies]
