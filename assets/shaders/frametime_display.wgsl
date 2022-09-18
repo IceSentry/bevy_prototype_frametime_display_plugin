@@ -1,32 +1,32 @@
-var<private> COLORS_COUNTS: i32 = 4;
+var<private> COLORS_COUNT: i32 = 4;
 
 struct Config {
-    dt_min: f32;
-    dt_max: f32;
-    dt_min_log2: f32;
-    dt_max_log2: f32;
-    max_width: f32;
-    len: i32;
-    colors: mat4x4<f32>;
-    dts: vec4<f32>;
-};
+    dt_min: f32,
+    dt_max: f32,
+    dt_min_log2: f32,
+    dt_max_log2: f32,
+    max_width: f32,
+    len: i32,
+    colors: mat4x4<f32>,
+    dts: vec4<f32>,
+}
 
-[[group(1), binding(0)]]
+@group(1) @binding(0)
 var<uniform> config: Config;
 
 struct Frametimes {
-    values: array<f32>;
-};
+    values: array<f32>,
+}
 
-[[group(1), binding(1)]]
+@group(1) @binding(1)
 var<storage> frametimes: Frametimes;
 
 struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] world_normal: vec3<f32>;
-    [[location(2)]] uv: vec2<f32>;
-};
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) world_normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
+}
 
 fn sdf_square(pos: vec2<f32>, half_size: vec2<f32>, offset: vec2<f32>) -> f32 {
     let p = pos - offset;
@@ -41,18 +41,18 @@ fn color_from_dt(dt: f32) -> vec4<f32> {
         return config.colors[0];
     }
 
-    for (var i = 0; i < COLORS_COUNTS; i = i + 1) {
+    for (var i = 0; i < COLORS_COUNT; i = i + 1) {
         if (dt < config.dts[i]) {
             let t = (dt - config.dts[i - 1]) / (config.dts[i] - config.dts[i - 1]);
             return mix(config.colors[i - 1], config.colors[i], t);
         }
     }
-    return config.colors[COLORS_COUNTS - 1];
+    return config.colors[COLORS_COUNT - 1];
 }
 
 
-[[stage(fragment)]]
-fn fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let dt_min = config.dt_min;
     let dt_max = config.dt_max;
     let dt_min_log2 = config.dt_min_log2;
