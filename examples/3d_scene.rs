@@ -1,5 +1,5 @@
 use bevy::{asset::AssetServerSettings, prelude::*};
-use bevy_prototype_frametime_display_plugin::{CameraOverlay, OverlayPlugin};
+use bevy_prototype_frametime_display_plugin::{CameraOverlay, OverlayConfig, OverlayPlugin};
 
 fn main() {
     App::new()
@@ -8,14 +8,8 @@ fn main() {
             ..default()
         })
         .add_plugins(DefaultPlugins)
-        // If you need to configure it, simply insert a FrametimeDisplayDescriptor
-        // and change any config
-        // .insert_resource(FrametimeDisplayDescriptor {
-        //     width: 200.0,
-        //     height: 50.0,
-        //     position: Position::TopRight,
-        //     ..default()
-        // })
+        // If you need to configure it
+        .insert_resource(OverlayConfig { ..default() })
         // Insert the plugin on the app
         .add_plugin(OverlayPlugin)
         .add_startup_system(setup_3d_scene)
