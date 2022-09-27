@@ -29,6 +29,7 @@ impl OverlayNode {
         let render_pipeline = world
             .resource_mut::<PipelineCache>()
             .queue_render_pipeline(overlay_pipeline.descriptor());
+        // world.resource_mut::<PipelineCache>().process_queue();
 
         Self {
             query: world.query_filtered(),
@@ -79,17 +80,17 @@ impl Node for OverlayNode {
 
         let mut tracked = TrackedRenderPass::new(render_pass);
 
-        let render_pipeline = world
-            .resource::<PipelineCache>()
-            .get_render_pipeline(self.render_pipeline_id)
-            .unwrap();
-
         let buffer = world.resource::<OverlayBuffer>();
 
-        tracked.set_render_pipeline(render_pipeline);
-        tracked.set_bind_group(0, &buffer.bind_group, &[]);
+        if let Some(render_pipeline) = world
+            .resource::<PipelineCache>()
+            .get_render_pipeline(self.render_pipeline_id)
+        {
+            tracked.set_render_pipeline(render_pipeline);
+            tracked.set_bind_group(0, &buffer.bind_group, &[]);
 
-        tracked.draw(0..3, 0..1);
+            tracked.draw(0..3, 0..1);
+        }
 
         Ok(())
     }
