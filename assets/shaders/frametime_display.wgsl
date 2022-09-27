@@ -14,6 +14,7 @@ struct Config {
 var<uniform> config: Config;
 
 struct Frametimes {
+    fps: f32,
     values: array<f32>,
 }
 @group(0) @binding(1)

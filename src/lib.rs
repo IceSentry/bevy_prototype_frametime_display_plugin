@@ -195,12 +195,14 @@ impl FromWorld for OverlayBuffer {
 
 #[derive(Debug, Clone, ShaderType, Resource)]
 pub struct Frametimes {
+    pub fps: f32,
     pub values: [f32; FRAMETIME_BUFFER_LEN],
 }
 
 impl Default for Frametimes {
     fn default() -> Self {
         Self {
+            fps: 0.0,
             values: [0.0; FRAMETIME_BUFFER_LEN],
         }
     }
@@ -228,6 +230,12 @@ fn update_frametimes(diagnostics: Extract<Res<Diagnostics>>, mut frametimes: Res
     if let Some(frame_time_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::FRAME_TIME) {
         if let Some(dt) = frame_time_diagnostic.value() {
             frametimes.push(dt as f32 / 1000.0);
+        }
+    }
+
+    if let Some(fps_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
+        if let Some(fps) = fps_diagnostic.value() {
+            frametimes.fps = fps as f32;
         }
     }
 }
