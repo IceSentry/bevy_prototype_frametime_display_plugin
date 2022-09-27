@@ -1,25 +1,20 @@
-mod material;
+// mod material;
+mod overlay_node;
+mod plugin;
 
-use crate::material::FrametimeMaterial;
 use bevy::{
     diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
-    math::vec2,
     prelude::*,
-    sprite::{Material2dPlugin, MaterialMesh2dBundle},
+    reflect::TypeUuid,
     window::WindowResized,
 };
-use material::FrametimeConfig;
+use overlay_node::FrametimeOverlayBuffer;
+pub use plugin::{CameraOverlay, OverlayPlugin};
 
-/// The amount of frametimes kept in the buffer to be rendered in the display
-/// Since the bars aren't all of the same size, this is the maximum value possible
-// TODO make this configurable
-const FRAMETIME_BUFFER_LEN: usize = 150;
+pub const OVERLAY_SHADER_HANDLE: HandleUntyped =
+    HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 1236245567947772696);
 
-/// The layer used to render the display
-/// Set to a high number to make sure it renders on top
-// TODO maybe make this configurable?
-const Z_LAYER: f32 = 500.0;
-
+#[derive(Resource)]
 pub struct FrametimeDisplayDescriptor {
     /// The width of the display in pixels
     pub width: f32,
@@ -61,9 +56,7 @@ pub struct FrametimeDisplayPlugin;
 impl Plugin for FrametimeDisplayPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(FrameTimeDiagnosticsPlugin::default())
-            .add_plugin(Material2dPlugin::<FrametimeMaterial>::default())
             .init_resource::<FrametimeDisplayDescriptor>()
-            .add_startup_system(setup)
             .add_system(update_frametimes)
             .add_system(resize);
     }
@@ -71,45 +64,6 @@ impl Plugin for FrametimeDisplayPlugin {
 
 #[derive(Component)]
 struct FrametimeDisplay;
-
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut f_materials: ResMut<Assets<FrametimeMaterial>>,
-    windows: Res<Windows>,
-    desc: Res<FrametimeDisplayDescriptor>,
-) {
-    let window = windows.get_primary().expect("failed to get window");
-    commands
-        .spawn()
-        .insert_bundle(MaterialMesh2dBundle {
-            mesh: meshes
-                .add(shape::Quad::new(vec2(desc.width, desc.height)).into())
-                .into(),
-            transform: match desc.position {
-                Position::TopLeft => {
-                    Transform::from_xyz(0.0, (window.height() / 2.0) - (desc.height / 2.0), Z_LAYER)
-                }
-                Position::TopRight => Transform::from_xyz(
-                    (window.width() / 2.0) - (desc.width / 2.0),
-                    (window.height() / 2.0) - (desc.height / 2.0),
-                    Z_LAYER,
-                ),
-            },
-            material: f_materials.add(FrametimeMaterial {
-                config: FrametimeConfig {
-                    dt_min: desc.dt_min,
-                    dt_max: desc.dt_max,
-                    dt_min_log2: desc.dt_min.log2(),
-                    dt_max_log2: desc.dt_max.log2(),
-                    ..default()
-                },
-                ..default()
-            }),
-            ..default()
-        })
-        .insert(FrametimeDisplay);
-}
 
 fn resize(
     mut resize_events: EventReader<WindowResized>,
@@ -127,17 +81,9 @@ fn resize(
     }
 }
 
-fn update_frametimes(
-    diagnostics: Res<Diagnostics>,
-    mut materials: ResMut<Assets<FrametimeMaterial>>,
-    mut materials_query: Query<&Handle<FrametimeMaterial>>,
-) {
+fn update_frametimes(diagnostics: Res<Diagnostics>, mut buffer: ResMut<FrametimeOverlayBuffer>) {
     if let Some(frame_time_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::FRAME_TIME) {
-        for material_handle in &mut materials_query {
-            if let Some(material) = materials.get_mut(material_handle) {
-                let dt = frame_time_diagnostic.value();
-                material.frametimes.push(dt.unwrap_or(0.) as f32)
-            }
-        }
+        let dt = frame_time_diagnostic.value().unwrap();
+        buffer.frametimes_buffer.get_mut().push(dt as f32);
     }
 }

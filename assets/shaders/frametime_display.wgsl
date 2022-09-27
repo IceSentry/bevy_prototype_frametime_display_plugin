@@ -53,34 +53,35 @@ fn color_from_dt(dt: f32) -> vec4<f32> {
 
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    let dt_min = config.dt_min;
-    let dt_max = config.dt_max;
-    let dt_min_log2 = config.dt_min_log2;
-    let dt_max_log2 = config.dt_max_log2;
-
-    let max_width = config.max_width;
-
-    var pos = in.uv.xy;
-
-    // The general alogrithm is highly inspired by
-    // <https://github.com/sawickiap/RegEngine/blob/613c31fd60558a75c5b8902529acfa425fc97b2a/Source/Game.cpp#L331>
-
-    var width = 0.0;
-    for (var i = 0; i <= config.len; i = i + 1) {
-        let dt = frametimes.values[i];
-        let frame_width = (dt / dt_min);
-        let frame_width = frame_width / max_width;
-
-        let frame_height_factor = (log2(dt) - dt_min_log2) / (dt_max_log2 - dt_min_log2);
-        let frame_height_factor_norm = min(max(0.0, frame_height_factor), 1.0);
-        let frame_height = mix(0.0, 1.0, frame_height_factor_norm);
-
-        if (sdf_square(pos, vec2<f32>(frame_width / 2.0, frame_height), vec2<f32>(width + frame_width / 2., 1.)) < 0.0) {
-            return color_from_dt(dt);
-        }
-
-        width = width + frame_width;
-    }
-
     return vec4<f32>(0.0, 0.0, 0.0, 0.25);
+    // let dt_min = config.dt_min;
+    // let dt_max = config.dt_max;
+    // let dt_min_log2 = config.dt_min_log2;
+    // let dt_max_log2 = config.dt_max_log2;
+
+    // let max_width = config.max_width;
+
+    // var pos = in.uv.xy;
+
+    // // The general alogrithm is highly inspired by
+    // // <https://github.com/sawickiap/RegEngine/blob/613c31fd60558a75c5b8902529acfa425fc97b2a/Source/Game.cpp#L331>
+
+    // var width = 0.0;
+    // for (var i = 0; i <= config.len; i = i + 1) {
+    //     let dt = frametimes.values[i];
+    //     let frame_width = (dt / dt_min);
+    //     let frame_width = frame_width / max_width;
+
+    //     let frame_height_factor = (log2(dt) - dt_min_log2) / (dt_max_log2 - dt_min_log2);
+    //     let frame_height_factor_norm = min(max(0.0, frame_height_factor), 1.0);
+    //     let frame_height = mix(0.0, 1.0, frame_height_factor_norm);
+
+    //     if (sdf_square(pos, vec2<f32>(frame_width / 2.0, frame_height), vec2<f32>(width + frame_width / 2., 1.)) < 0.0) {
+    //         return color_from_dt(dt);
+    //     }
+
+    //     width = width + frame_width;
+    // }
+
+    // return vec4<f32>(0.0, 0.0, 0.0, 0.25);
 }

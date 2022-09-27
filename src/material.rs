@@ -1,13 +1,12 @@
 use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     prelude::*,
-    reflect::TypeUuid,
+    reflect::{erased_serde::private::serde::__private::de, TypeUuid},
     render::{
         render_asset::{PrepareAssetError, RenderAsset},
         render_resource::{
-            encase, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer,
-            BufferBindingType, BufferInitDescriptor, BufferUsages, ShaderStages, ShaderType,
+            encase, AsBindGroup, BindGroup, BindGroupDescriptor, BindGroupEntry, Buffer,
+            BufferInitDescriptor, BufferUsages, ShaderRef, ShaderType,
         },
         renderer::RenderDevice,
     },
@@ -48,6 +47,7 @@ pub struct Frametimes {
 
 impl Default for Frametimes {
     fn default() -> Self {
+        Frametimes::assert_uniform_compat();
         Self {
             values: [0.0; FRAMETIME_BUFFER_LEN],
         }
@@ -165,40 +165,8 @@ impl RenderAsset for FrametimeMaterial {
     }
 }
 
-impl Material2d for FrametimeMaterial {
-    fn fragment_shader(asset_server: &AssetServer) -> Option<Handle<Shader>> {
-        Some(asset_server.load("shaders/frametime_display.wgsl"))
-    }
-
-    fn bind_group(render_asset: &<Self as RenderAsset>::PreparedAsset) -> &BindGroup {
-        &render_asset.bind_group
-    }
-
-    fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
-        render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("Frametime Display Bind Group Layout"),
-            entries: &[
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(FrametimeConfig::min_size()),
-                    },
-                    count: None,
-                },
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: Some(Frametimes::min_size()),
-                    },
-                    count: None,
-                },
-            ],
-        })
-    }
-}
+// impl Material2d for FrametimeMaterial {
+//     fn fragment_shader() -> ShaderRef {
+//         "shaders/frametime_display.wgsl".into()
+//     }
+// }
