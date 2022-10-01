@@ -95,10 +95,12 @@ let ch_z = 122;
 
 // symbols
 let ch_space = 32;
+let ch_dot = 46;
+let ch_colon = 58;
 
-let FONT_SIZE: f32 = 1.75;
-var<private> U: vec2<f32> = vec2<f32>(0., 0.);
-var<private> O: f32 = 0.0;
+let FONT_SIZE: f32 = 1.5;
+var<private> TEXT_CURRENT_POS: vec2<f32> = vec2<f32>(0., 0.);
+var<private> TEXT_OUTPUT: f32 = 0.0;
 
 // loosely based on <https://www.shadertoy.com/view/stVBRR>
 fn sdf_texture_char(p: vec2<f32>, c: i32) -> f32 {
@@ -111,14 +113,62 @@ fn sdf_texture_char(p: vec2<f32>, c: i32) -> f32 {
 }
 
 fn print(c: i32) {
-    let out = sdf_texture_char(U, c);
-    U.x -= .5;
-    O += out;
+    let out = sdf_texture_char(TEXT_CURRENT_POS, c);
+    TEXT_CURRENT_POS.x -= .5;
+    TEXT_OUTPUT += out;
 }
 
 fn newline(uv: vec2<f32>) {
-    U.x = (uv.x * 64. / FONT_SIZE);
-    U.y -= 1.;
+    TEXT_CURRENT_POS.x = (uv.x * 64. / FONT_SIZE);
+    TEXT_CURRENT_POS.y -= 1.;
+}
+
+fn get_digit(in_value: f32) -> i32 {
+    var value = floor(in_value);
+    if (value == 0.0) {
+        return ch_0;
+    }
+    if (value == 1.0) {
+        return ch_1;
+    }
+    if (value == 2.0) {
+        return ch_2;
+    }
+    if (value == 3.0) {
+        return ch_3;
+    }
+    if (value == 4.0) {
+        return ch_4;
+    }
+    if (value == 5.0) {
+        return ch_5;
+    }
+    if (value == 6.0) {
+        return ch_6;
+    }
+    if (value == 7.0) {
+        return ch_7;
+    }
+    if (value == 8.0) {
+        return ch_8;
+    }
+    if (value == 9.0) {
+        return ch_9;
+    }
+    return 0;
+}
+
+fn print_number(number: f32) {
+    for (var i = 3; i >= -1; i -= 1) {
+        let digit = (number / pow(10., f32(i))) % 10.;
+        if (i == -1) {
+            // add decimal point
+            print(ch_dot);
+        }
+        if (abs(number) > pow(10., f32(i)) || i == 0) {
+            print(get_digit(digit));
+        }
+    }
 }
 
 fn sdf_square(pos: vec2<f32>, half_size: vec2<f32>, offset: vec2<f32>) -> f32 {
@@ -197,27 +247,37 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let section_height = 50.;
     let total_area = vec2<f32>(area_width, section_height * 2.);
     let uv = in.uv.xy / f32(textureDimensions(font_texture).y);
-    U = uv * 64. / FONT_SIZE;
-    // TODO print_number
-    print(ch_1);
-    print(ch_4);
-    print(ch_4);
+    if (in.uv.x > total_area.x || in.uv.y > total_area.y) {
+        discard;
+    }
+
+    TEXT_CURRENT_POS = uv * 64. / FONT_SIZE;
+
+    print_number(frametimes.fps);
     print(ch_space);
     print(ch_f);
     print(ch_p);
     print(ch_s);
-    if (O > 0.0) {
-        return vec4<f32>(O);
-    }
-
-    if (in.uv.x > total_area.x || in.uv.y > total_area.y) {
-        discard;
-    }
+    newline(uv);
+    print(ch_f);
+    print(ch_r);
+    print(ch_a);
+    print(ch_m);
+    print(ch_e);
+    print(ch_t);
+    print(ch_i);
+    print(ch_m);
+    print(ch_e);
+    print(ch_colon);
 
     var graph_color = draw_frametime_graph(in.uv.xy, area_width, section_height);
     if (any(graph_color != vec4<f32>(0.0))) {
         return graph_color;
     }
 
-    return background;
+    if (TEXT_OUTPUT > 0.0) {
+        return vec4<f32>(TEXT_OUTPUT);
+    } else {
+        return background;
+    }
 }
