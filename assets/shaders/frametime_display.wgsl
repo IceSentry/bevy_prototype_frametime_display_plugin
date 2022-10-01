@@ -20,6 +20,107 @@ struct Frametimes {
 @group(0) @binding(1)
 var<storage> frametimes: Frametimes;
 
+@group(0) @binding(2)
+var font_texture: texture_2d<f32>;
+@group(0) @binding(3)
+var font_sampler: sampler;
+
+// numbers
+let ch_0 = 48;
+let ch_1 = 49;
+let ch_2 = 50;
+let ch_3 = 51;
+let ch_4 = 52;
+let ch_5 = 53;
+let ch_6 = 54;
+let ch_7 = 55;
+let ch_8 = 56;
+let ch_9 = 57;
+
+// uppercase letters
+let ch_A = 65;
+let ch_B = 66;
+let ch_C = 67;
+let ch_D = 68;
+let ch_E = 69;
+let ch_F = 70;
+let ch_G = 71;
+let ch_H = 72;
+let ch_I = 73;
+let ch_J = 74;
+let ch_K = 75;
+let ch_L = 76;
+let ch_M = 77;
+let ch_N = 78;
+let ch_O = 79;
+let ch_P = 80;
+let ch_Q = 81;
+let ch_R = 82;
+let ch_S = 83;
+let ch_T = 84;
+let ch_U = 85;
+let ch_V = 86;
+let ch_W = 87;
+let ch_X = 88;
+let ch_Y = 89;
+let ch_Z = 90;
+let ch_a = 97;
+let ch_b = 98;
+let ch_c = 99;
+
+// lowercase letters
+let ch_d = 100;
+let ch_e = 101;
+let ch_f = 102;
+let ch_g = 103;
+let ch_h = 104;
+let ch_i = 105;
+let ch_j = 106;
+let ch_k = 107;
+let ch_l = 108;
+let ch_m = 109;
+let ch_n = 110;
+let ch_o = 111;
+let ch_p = 112;
+let ch_q = 113;
+let ch_r = 114;
+let ch_s = 115;
+let ch_t = 116;
+let ch_u = 117;
+let ch_v = 118;
+let ch_w = 119;
+let ch_x = 120;
+let ch_y = 121;
+let ch_z = 122;
+
+// symbols
+let ch_space = 32;
+
+let FONT_SIZE: f32 = 1.75;
+var<private> U: vec2<f32> = vec2<f32>(0., 0.);
+var<private> O: f32 = 0.0;
+
+// loosely based on <https://www.shadertoy.com/view/stVBRR>
+fn sdf_texture_char(p: vec2<f32>, c: i32) -> f32 {
+    let char_uv = p / 16. + fract(vec2<f32>(vec2<i32>(c, c / 16)) / 16.);
+    let char_sample = textureSample(font_texture, font_sampler, char_uv);
+    if (p.x < 0.0 || p.x > 1. || p.y < 0.0 || p.y > 1.) {
+        return 0.0;
+    }
+    return char_sample.x;
+}
+
+fn print(c: i32) {
+    let out = sdf_texture_char(U, c);
+    U.x -= .5;
+    O += out;
+}
+
+fn newline(uv: vec2<f32>) {
+    U.x = (uv.x * 64. / FONT_SIZE);
+    U.y -= 1.;
+}
+
 fn sdf_square(pos: vec2<f32>, half_size: vec2<f32>, offset: vec2<f32>) -> f32 {
     let p = pos - offset;
     let dist = abs(p) - half_size;
@@ -42,30 +143,8 @@ fn color_from_dt(dt: f32) -> vec4<f32> {
     return config.colors[COLORS_COUNT - 1];
 }
 
-struct VertexOutput {
-    @builtin(position) clip_position: vec4<f32>,
-}
-
-@vertex
-fn vertex(
-    @builtin(vertex_index) in_vertex_index: u32,
-) -> VertexOutput {
-    var out: VertexOutput;
-    out.clip_position = vec4<f32>(f32(in_vertex_index & 1u), f32(in_vertex_index >> 1u), 0.5, 0.5) * 4.0 - 1.0;
-    return out;
-}
-
-@fragment
-fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
-    let background = vec4<f32>(0.0, 0.0, 0.0, 0.4);
-    let area_width = 150.0;
-    let section_height = 50.0;
-    let total_area = vec2<f32>(area_width, section_height);
-
-    if (in.clip_position.x > total_area.x || in.clip_position.y > total_area.y) {
-        discard;
-    }
-
+fn draw_frametime_graph(uv: vec2<f32>, width: f32, height: f32) -> vec4<f32> {
+    // Frametime graph
     let dt_min = config.dt_min;
     let dt_max = config.dt_max;
     let dt_min_log2 = config.dt_min_log2;
@@ -75,9 +154,9 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     // The general alogrithm is highly inspired by
     // <https://github.com/sawickiap/RegEngine/blob/613c31fd60558a75c5b8902529acfa425fc97b2a/Source/Game.cpp#L331>
 
-    let graph_area = vec2<f32>(area_width, section_height);
-    let pos_in_area = (in.clip_position.xy * vec2<f32>(1.0, -1.0) + graph_area) / graph_area;
-    var width = 0.0;
+    let graph_area = vec2<f32>(width, height);
+    let pos_in_area = (uv * vec2<f32>(1.0, -1.0) + graph_area + vec2<f32>(0.0, height)) / graph_area;
+    var graph_width = 0.0;
     for (var i = 0; i <= config.len; i = i + 1) {
         let dt = frametimes.values[i];
         let frame_width = (dt / dt_min);
@@ -88,12 +167,56 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
         let frame_height = mix(0.0, 1.0, frame_height_factor_norm);
 
         let size = vec2<f32>(frame_width, frame_height) / 2.;
-        let offset = vec2<f32>(1. + width + frame_width / 2., frame_height / 2.);
+        let offset = vec2<f32>(1. + graph_width + frame_width / 2., frame_height / 2.);
         if (sdf_square(pos_in_area, size, offset) < 0.0) {
             return color_from_dt(dt);
         }
 
-        width = width + frame_width;
+        graph_width = graph_width + frame_width;
+    }
+    return vec4<f32>(0.0);
+}
+
+struct VertexOutput {
+    @builtin(position) uv: vec4<f32>,
+}
+
+@vertex
+fn vertex(
+    @builtin(vertex_index) in_vertex_index: u32,
+) -> VertexOutput {
+    var out: VertexOutput;
+    out.uv = vec4<f32>(f32(in_vertex_index & 1u), f32(in_vertex_index >> 1u), 0.5, 0.5) * 4.0 - 1.0;
+    return out;
+}
+
+@fragment
+fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
+    let background = vec4<f32>(0.0, 0.0, 0.0, 0.4);
+    let area_width = 150.0;
+    let section_height = 50.;
+    let total_area = vec2<f32>(area_width, section_height * 2.);
+    let uv = in.uv.xy / f32(textureDimensions(font_texture).y);
+    U = uv * 64. / FONT_SIZE;
+    // TODO print_number
+    print(ch_1);
+    print(ch_4);
+    print(ch_4);
+    print(ch_space);
+    print(ch_f);
+    print(ch_p);
+    print(ch_s);
+    if (O > 0.0) {
+        return vec4<f32>(O);
+    }
+
+    if (in.uv.x > total_area.x || in.uv.y > total_area.y) {
+        discard;
+    }
+
+    var graph_color = draw_frametime_graph(in.uv.xy, area_width, section_height);
+    if (any(graph_color != vec4<f32>(0.0))) {
+        return graph_color;
     }
 
     return background;
