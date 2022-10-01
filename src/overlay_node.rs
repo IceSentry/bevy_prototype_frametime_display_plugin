@@ -11,7 +11,7 @@ use bevy::{
     },
 };
 
-use crate::{pipeline::OverlayPipeline, CameraOverlay, OverlayBuffer};
+use crate::{pipeline::OverlayPipeline, CameraOverlay};
 
 pub(crate) mod graph {
     pub const NAME: &str = "OVERLAY";
@@ -80,14 +80,14 @@ impl Node for OverlayNode {
 
         let mut tracked = TrackedRenderPass::new(render_pass);
 
-        let buffer = world.resource::<OverlayBuffer>();
+        let pipeline = world.resource::<OverlayPipeline>();
 
         if let Some(render_pipeline) = world
             .resource::<PipelineCache>()
             .get_render_pipeline(self.render_pipeline_id)
         {
             tracked.set_render_pipeline(render_pipeline);
-            tracked.set_bind_group(0, &buffer.bind_group, &[]);
+            tracked.set_bind_group(0, &pipeline.bind_group, &[]);
 
             tracked.draw(0..3, 0..1);
         }

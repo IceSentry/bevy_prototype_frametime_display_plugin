@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 mod overlay_node;
 mod pipeline;
 
@@ -8,12 +10,11 @@ use bevy::{
     render::{
         camera::CameraRenderGraph,
         extract_component::{ExtractComponent, ExtractComponentPlugin},
+        render_asset::RenderAssets,
         render_graph::{RenderGraph, SlotInfo, SlotType},
-        render_resource::{
-            BindGroup, BindGroupDescriptor, BindGroupEntry, ShaderType, StorageBuffer,
-            UniformBuffer,
-        },
+        render_resource::{OwnedBindingResource, ShaderType, StorageBuffer, UniformBuffer},
         renderer::{RenderDevice, RenderQueue},
+        texture::{FallbackImage, GpuImage},
         view::VisibleEntities,
         Extract, RenderApp, RenderStage,
     },
@@ -42,6 +43,7 @@ pub struct OverlayConfig {
     ///
     /// Defaults to green, yellow, orange, red
     pub colors: Mat4,
+    pub font_handle: Option<Handle<Image>>,
 }
 
 impl Default for OverlayConfig {
@@ -61,6 +63,7 @@ impl Default for OverlayConfig {
                 Color::ORANGE.as_linear_rgba_f32(),
                 Color::RED.as_linear_rgba_f32(),
             ]),
+            font_handle: None,
         }
     }
 }
@@ -81,7 +84,8 @@ impl Plugin for OverlayPlugin {
         app.add_plugin(ExtractComponentPlugin::<CameraOverlay>::default())
             .add_startup_system(move |mut commands: Commands| {
                 commands.spawn(CameraOverlayBundle::default());
-            });
+            })
+            .add_startup_system(load_font);
 
         let render_app = match app.get_sub_app_mut(RenderApp) {
             Ok(render_app) => render_app,
@@ -91,11 +95,12 @@ impl Plugin for OverlayPlugin {
         render_app
             .init_resource::<OverlayConfig>()
             .init_resource::<Frametimes>()
+            .init_resource::<OverlayBindGroupBuffers>()
             .init_resource::<OverlayPipeline>()
-            .init_resource::<OverlayBuffer>()
             .add_system_to_stage(RenderStage::Extract, extract_overlay_camera_phases)
             .add_system_to_stage(RenderStage::Extract, update_frametimes)
-            .add_system_to_stage(RenderStage::Prepare, prepare_frametime_overlay_buffer);
+            .add_system_to_stage(RenderStage::Extract, extract_font_handle)
+            .add_system_to_stage(RenderStage::Prepare, prepare_overlay_bind_group);
 
         let pass_node_overlay = OverlayNode::new(&mut render_app.world);
         let mut graph = render_app.world.resource_mut::<RenderGraph>();
@@ -115,6 +120,13 @@ impl Plugin for OverlayPlugin {
         graph.add_sub_graph(graph::NAME, overlay_graph);
     }
 }
+
+fn load_font(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(FontImage(asset_server.load("font.png")));
+}
+
+#[derive(Resource, Clone)]
+pub struct FontImage(Handle<Image>);
 
 #[derive(Debug, Clone, ShaderType, Default)]
 pub struct OverlayConfigBuffer {
@@ -144,19 +156,20 @@ impl OverlayConfigBuffer {
 }
 
 #[derive(Resource)]
-pub struct OverlayBuffer {
+pub struct OverlayBindGroupBuffers {
     pub config_buffer: UniformBuffer<OverlayConfigBuffer>,
     pub frametimes_buffer: StorageBuffer<Frametimes>,
-    pub bind_group: BindGroup,
+    pub font_image_texture: OwnedBindingResource,
+    pub font_image_sampler: OwnedBindingResource,
 }
 
-impl FromWorld for OverlayBuffer {
+impl FromWorld for OverlayBindGroupBuffers {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
         let render_queue = world.resource::<RenderQueue>();
         let config = world.resource::<OverlayConfig>();
         let frametimes = world.resource::<Frametimes>();
-        let pipeline = world.resource::<OverlayPipeline>();
+        let fallback_image = world.resource::<FallbackImage>();
 
         let mut config_buffer = UniformBuffer::default();
         config_buffer.set(OverlayConfigBuffer::new(
@@ -170,26 +183,23 @@ impl FromWorld for OverlayBuffer {
         frametimes_buffer.set(frametimes.clone());
         frametimes_buffer.write_buffer(render_device, render_queue);
 
-        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
-            label: Some("frametime bind group"),
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: config_buffer.binding().unwrap(),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: frametimes_buffer.binding().unwrap(),
-                },
-            ],
-            layout: &pipeline.layout,
-        });
+        let font_image_texture =
+            OwnedBindingResource::TextureView(fallback_image.texture_view.clone());
+        let font_image_sampler = OwnedBindingResource::Sampler(fallback_image.sampler.clone());
 
-        OverlayBuffer {
+        OverlayBindGroupBuffers {
             config_buffer,
             frametimes_buffer,
-            bind_group,
+            font_image_texture,
+            font_image_sampler,
         }
+    }
+}
+
+impl OverlayBindGroupBuffers {
+    fn update_font_image(&mut self, image: &GpuImage) {
+        self.font_image_texture = OwnedBindingResource::TextureView(image.texture_view.clone());
+        self.font_image_sampler = OwnedBindingResource::Sampler(image.sampler.clone());
     }
 }
 
@@ -240,17 +250,33 @@ fn update_frametimes(diagnostics: Extract<Res<Diagnostics>>, mut frametimes: Res
     }
 }
 
-fn prepare_frametime_overlay_buffer(
-    mut buffer: ResMut<OverlayBuffer>,
+fn extract_font_handle(mut commands: Commands, font_image: Extract<Res<FontImage>>) {
+    commands.insert_resource(font_image.clone());
+}
+
+fn prepare_overlay_bind_group(
+    mut bind_group: ResMut<OverlayBindGroupBuffers>,
+    mut pipeline: ResMut<OverlayPipeline>,
     frametimes: Res<Frametimes>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
+    font_handle: Res<FontImage>,
+    images: Res<RenderAssets<Image>>,
+    mut font_loaded: Local<bool>,
 ) {
     if frametimes.is_changed() {
-        buffer.frametimes_buffer.set(frametimes.clone());
-        buffer
+        bind_group.frametimes_buffer.set(frametimes.clone());
+        bind_group
             .frametimes_buffer
             .write_buffer(&render_device, &render_queue);
+    }
+
+    if !*font_loaded {
+        if let Some(image) = images.get(&font_handle.0) {
+            bind_group.update_font_image(image);
+            pipeline.update_bind_group(&render_device, &bind_group);
+            *font_loaded = true;
+        }
     }
 }
 
