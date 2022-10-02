@@ -29,6 +29,7 @@ use pipeline::OverlayPipeline;
 // TODO show vsync option
 // TODO display toggle
 // TODO stabilize FPS values
+// TODO embed font
 
 /// The amount of frametimes kept in the buffer to be rendered in the display
 /// Since the bars aren't all of the same size, this is the maximum value possible
