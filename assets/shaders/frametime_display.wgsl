@@ -15,6 +15,9 @@ var<uniform> config: Config;
 
 struct Frametimes {
     fps: f32,
+    frame_count: u32,
+    resolution: vec2<u32>,
+    scale: f32,
     values: array<f32>,
 }
 @group(0) @binding(1)
@@ -97,8 +100,11 @@ let ch_z = 122;
 let ch_space = 32;
 let ch_dot = 46;
 let ch_colon = 58;
+let ch_lparen = 40;
+let ch_rparen = 41;
+let ch_percent = 37;
 
-let FONT_SIZE: f32 = 1.5;
+let FONT_SIZE: f32 = 1.3;
 var<private> TEXT_CURRENT_POS: vec2<f32> = vec2<f32>(0., 0.);
 var<private> TEXT_OUTPUT: f32 = 0.0;
 
@@ -159,13 +165,27 @@ fn get_digit(in_value: f32) -> i32 {
 }
 
 fn print_number(number: f32) {
-    for (var i = 3; i >= -1; i -= 1) {
+    for (var i = 4; i >= -1; i -= 1) {
         let digit = (number / pow(10., f32(i))) % 10.;
         if (i == -1) {
             // add decimal point
             print(ch_dot);
         }
         if (abs(number) > pow(10., f32(i)) || i == 0) {
+            print(get_digit(digit));
+        }
+    }
+}
+
+fn print_u32(in_number: u32) {
+    var number = f32(in_number);
+    for (var i = 8; i >= 0; i -= 1) {
+        let digit = (number / pow(10., f32(i))) % 10.;
+        if (i == -1) {
+            // add decimal point
+            // print(ch_dot);
+        }
+        if (abs(number) > pow(10., f32(i))) {
             print(get_digit(digit));
         }
     }
@@ -205,7 +225,7 @@ fn draw_frametime_graph(uv: vec2<f32>, width: f32, height: f32) -> vec4<f32> {
     // <https://github.com/sawickiap/RegEngine/blob/613c31fd60558a75c5b8902529acfa425fc97b2a/Source/Game.cpp#L331>
 
     let graph_area = vec2<f32>(width, height);
-    let pos_in_area = (uv * vec2<f32>(1.0, -1.0) + graph_area + vec2<f32>(0.0, height)) / graph_area;
+    let pos_in_area = (uv * vec2<f32>(1.0, -1.0) + graph_area + vec2<f32>(0.0, height * 2.)) / graph_area;
     var graph_width = 0.0;
     for (var i = 0; i <= config.len; i = i + 1) {
         let dt = frametimes.values[i];
@@ -243,9 +263,9 @@ fn vertex(
 @fragment
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let background = vec4<f32>(0.0, 0.0, 0.0, 0.4);
-    let area_width = 150.0;
+    let area_width = 175.0;
     let section_height = 50.;
-    let total_area = vec2<f32>(area_width, section_height * 2.);
+    let total_area = vec2<f32>(area_width, section_height * 3.);
     let uv = in.uv.xy / f32(textureDimensions(font_texture).y);
     if (in.uv.x > total_area.x || in.uv.y > total_area.y) {
         discard;
@@ -258,17 +278,36 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     print(ch_f);
     print(ch_p);
     print(ch_s);
+
     newline(uv);
-    print(ch_f);
+
+    let ms = frametimes.values[config.len - 1];
+    // return vec4<f32>(ms, 0., 0., 1.0);
+    print_number(ms * 1000.);
+    print(ch_m);
+    print(ch_s);
+
+    newline(uv);
+
+    print(ch_F);
     print(ch_r);
     print(ch_a);
     print(ch_m);
     print(ch_e);
-    print(ch_t);
-    print(ch_i);
-    print(ch_m);
-    print(ch_e);
     print(ch_colon);
+    print(ch_space);
+    print_u32(frametimes.frame_count);
+
+    newline(uv);
+
+    print_u32(frametimes.resolution.x);
+    print(ch_x);
+    print_u32(frametimes.resolution.y);
+    print(ch_space);
+    print(ch_lparen);
+    print_u32(u32(frametimes.scale * 100.));
+    print(ch_percent);
+    print(ch_rparen);
 
     var graph_color = draw_frametime_graph(in.uv.xy, area_width, section_height);
     if (any(graph_color != vec4<f32>(0.0))) {

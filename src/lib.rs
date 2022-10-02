@@ -4,6 +4,7 @@ mod overlay_node;
 mod pipeline;
 
 use bevy::{
+    core::FrameCount,
     diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
     ecs::query::QueryItem,
     prelude::*,
@@ -97,7 +98,7 @@ impl Plugin for OverlayPlugin {
             .init_resource::<Frametimes>()
             .init_resource::<OverlayBindGroupBuffers>()
             .init_resource::<OverlayPipeline>()
-            .add_system_to_stage(RenderStage::Extract, extract_overlay_camera_phases)
+            .add_system_to_stage(RenderStage::Extract, extract_overlay_camera)
             .add_system_to_stage(RenderStage::Extract, update_frametimes)
             .add_system_to_stage(RenderStage::Extract, extract_font_handle)
             .add_system_to_stage(RenderStage::Prepare, prepare_overlay_bind_group);
@@ -122,6 +123,7 @@ impl Plugin for OverlayPlugin {
 }
 
 fn load_font(mut commands: Commands, asset_server: Res<AssetServer>) {
+    // TODO embed font in plugin
     commands.insert_resource(FontImage(asset_server.load("font.png")));
 }
 
@@ -206,6 +208,9 @@ impl OverlayBindGroupBuffers {
 #[derive(Debug, Clone, ShaderType, Resource)]
 pub struct Frametimes {
     pub fps: f32,
+    pub frame_count: u32,
+    pub resolution: UVec2,
+    pub scale: f32,
     pub values: [f32; FRAMETIME_BUFFER_LEN],
 }
 
@@ -213,6 +218,9 @@ impl Default for Frametimes {
     fn default() -> Self {
         Self {
             fps: 0.0,
+            frame_count: 0,
+            resolution: UVec2::ZERO,
+            scale: 1.0,
             values: [0.0; FRAMETIME_BUFFER_LEN],
         }
     }
@@ -225,7 +233,7 @@ impl Frametimes {
     }
 }
 
-fn extract_overlay_camera_phases(
+fn extract_overlay_camera(
     mut commands: Commands,
     cameras_overlay: Extract<Query<(Entity, &Camera), With<CameraOverlay>>>,
 ) {
@@ -236,7 +244,12 @@ fn extract_overlay_camera_phases(
     }
 }
 
-fn update_frametimes(diagnostics: Extract<Res<Diagnostics>>, mut frametimes: ResMut<Frametimes>) {
+fn update_frametimes(
+    diagnostics: Extract<Res<Diagnostics>>,
+    mut frametimes: ResMut<Frametimes>,
+    frame_count: Extract<Res<FrameCount>>,
+    windows: Extract<Res<Windows>>,
+) {
     if let Some(frame_time_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::FRAME_TIME) {
         if let Some(dt) = frame_time_diagnostic.value() {
             frametimes.push(dt as f32 / 1000.0);
@@ -247,6 +260,13 @@ fn update_frametimes(diagnostics: Extract<Res<Diagnostics>>, mut frametimes: Res
         if let Some(fps) = fps_diagnostic.value() {
             frametimes.fps = fps as f32;
         }
+    }
+
+    frametimes.frame_count = frame_count.0;
+    if let Some(window) = windows.get_primary() {
+        frametimes.resolution.x = window.physical_width();
+        frametimes.resolution.y = window.physical_height();
+        frametimes.scale = window.scale_factor() as f32;
     }
 }
 
