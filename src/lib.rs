@@ -24,6 +24,12 @@ use bevy::{
 use overlay_node::{graph, OverlayNode};
 use pipeline::OverlayPipeline;
 
+// TODO show gpu and cpu information
+// TODO show avg, min, max frametime
+// TODO show vsync option
+// TODO display toggle
+// TODO stabilize FPS values
+
 /// The amount of frametimes kept in the buffer to be rendered in the display
 /// Since the bars aren't all of the same size, this is the maximum value possible
 // TODO make this configurable
