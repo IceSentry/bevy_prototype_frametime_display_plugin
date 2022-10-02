@@ -13,7 +13,7 @@ use bevy::{
     },
 };
 
-use crate::{Frametimes, OverlayBindGroupBuffers, OverlayConfigBuffer};
+use crate::{Frametimes, OverlayBindGroups, OverlayConfigUniform};
 
 #[derive(Clone, Resource)]
 pub struct OverlayPipeline {
@@ -26,7 +26,7 @@ impl FromWorld for OverlayPipeline {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
         let asset_server = world.resource::<AssetServer>();
-        let buffer = world.resource::<OverlayBindGroupBuffers>();
+        let buffer = world.resource::<OverlayBindGroups>();
 
         let layout = OverlayPipeline::layout(render_device);
         let bind_group = OverlayPipeline::create_bind_group(render_device, &layout, buffer);
@@ -43,7 +43,7 @@ impl OverlayPipeline {
     pub fn update_bind_group(
         &mut self,
         render_device: &RenderDevice,
-        bind_group_buffers: &OverlayBindGroupBuffers,
+        bind_group_buffers: &OverlayBindGroups,
     ) {
         self.bind_group =
             OverlayPipeline::create_bind_group(render_device, &self.layout, bind_group_buffers);
@@ -52,7 +52,7 @@ impl OverlayPipeline {
     pub fn create_bind_group(
         render_device: &RenderDevice,
         layout: &BindGroupLayout,
-        buffer: &OverlayBindGroupBuffers,
+        buffer: &OverlayBindGroups,
     ) -> BindGroup {
         render_device.create_bind_group(&BindGroupDescriptor {
             label: Some("frametime bind group"),
@@ -87,7 +87,7 @@ impl OverlayPipeline {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: Some(OverlayConfigBuffer::min_size()),
+                        min_binding_size: Some(OverlayConfigUniform::min_size()),
                     },
                     count: None,
                 },

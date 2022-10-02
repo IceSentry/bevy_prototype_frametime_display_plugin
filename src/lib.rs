@@ -33,8 +33,9 @@ use pipeline::OverlayPipeline;
 
 /// The amount of frametimes kept in the buffer to be rendered in the display
 /// Since the bars aren't all of the same size, this is the maximum value possible
+/// The current value is somewhat arbitrary and was obtained by trial and error
 // TODO make this configurable
-pub const FRAMETIME_BUFFER_LEN: usize = 100;
+pub const FRAMETIME_BUFFER_LEN: usize = 64;
 
 // TODO use a struct containing each pair of dt and color
 // TODO support runtime config
@@ -64,7 +65,7 @@ impl Default for OverlayConfig {
                 1. / 30.,
                 1. / 15.
             ),
-            buffer_len: 100,
+            buffer_len: FRAMETIME_BUFFER_LEN,
             colors: Mat4::from_cols_array_2d(&[
                 Color::GREEN.as_linear_rgba_f32(),
                 Color::YELLOW.as_linear_rgba_f32(),
@@ -103,7 +104,7 @@ impl Plugin for OverlayPlugin {
         render_app
             .init_resource::<OverlayConfig>()
             .init_resource::<Frametimes>()
-            .init_resource::<OverlayBindGroupBuffers>()
+            .init_resource::<OverlayBindGroups>()
             .init_resource::<OverlayPipeline>()
             .add_system_to_stage(RenderStage::Extract, extract_overlay_camera)
             .add_system_to_stage(RenderStage::Extract, update_frametimes)
@@ -138,7 +139,7 @@ fn load_font(mut commands: Commands, asset_server: Res<AssetServer>) {
 pub struct FontImage(Handle<Image>);
 
 #[derive(Debug, Clone, ShaderType, Default)]
-pub struct OverlayConfigBuffer {
+pub struct OverlayConfigUniform {
     dt_min: f32,
     dt_max: f32,
     dt_min_log2: f32,
@@ -149,7 +150,7 @@ pub struct OverlayConfigBuffer {
     dts: Vec4,
 }
 
-impl OverlayConfigBuffer {
+impl OverlayConfigUniform {
     fn new(dts: Vec4, buffer_len: usize, colors: Mat4) -> Self {
         Self {
             dt_min: dts[0],
@@ -165,14 +166,14 @@ impl OverlayConfigBuffer {
 }
 
 #[derive(Resource)]
-pub struct OverlayBindGroupBuffers {
-    pub config_buffer: UniformBuffer<OverlayConfigBuffer>,
+pub struct OverlayBindGroups {
+    pub config_buffer: UniformBuffer<OverlayConfigUniform>,
     pub frametimes_buffer: StorageBuffer<Frametimes>,
     pub font_image_texture: OwnedBindingResource,
     pub font_image_sampler: OwnedBindingResource,
 }
 
-impl FromWorld for OverlayBindGroupBuffers {
+impl FromWorld for OverlayBindGroups {
     fn from_world(world: &mut World) -> Self {
         let render_device = world.resource::<RenderDevice>();
         let render_queue = world.resource::<RenderQueue>();
@@ -181,7 +182,7 @@ impl FromWorld for OverlayBindGroupBuffers {
         let fallback_image = world.resource::<FallbackImage>();
 
         let mut config_buffer = UniformBuffer::default();
-        config_buffer.set(OverlayConfigBuffer::new(
+        config_buffer.set(OverlayConfigUniform::new(
             config.dts,
             config.buffer_len,
             config.colors,
@@ -196,7 +197,7 @@ impl FromWorld for OverlayBindGroupBuffers {
             OwnedBindingResource::TextureView(fallback_image.texture_view.clone());
         let font_image_sampler = OwnedBindingResource::Sampler(fallback_image.sampler.clone());
 
-        OverlayBindGroupBuffers {
+        OverlayBindGroups {
             config_buffer,
             frametimes_buffer,
             font_image_texture,
@@ -205,7 +206,7 @@ impl FromWorld for OverlayBindGroupBuffers {
     }
 }
 
-impl OverlayBindGroupBuffers {
+impl OverlayBindGroups {
     fn update_font_image(&mut self, image: &GpuImage) {
         self.font_image_texture = OwnedBindingResource::TextureView(image.texture_view.clone());
         self.font_image_sampler = OwnedBindingResource::Sampler(image.sampler.clone());
@@ -282,7 +283,7 @@ fn extract_font_handle(mut commands: Commands, font_image: Extract<Res<FontImage
 }
 
 fn prepare_overlay_bind_group(
-    mut bind_group: ResMut<OverlayBindGroupBuffers>,
+    mut bind_group: ResMut<OverlayBindGroups>,
     mut pipeline: ResMut<OverlayPipeline>,
     frametimes: Res<Frametimes>,
     render_device: Res<RenderDevice>,

@@ -1,6 +1,4 @@
-var<private> COLORS_COUNT: i32 = 4;
-
-struct Config {
+struct OverlayConfig {
     dt_min: f32,
     dt_max: f32,
     dt_min_log2: f32,
@@ -11,7 +9,7 @@ struct Config {
     dts: vec4<f32>,
 }
 @group(0) @binding(0)
-var<uniform> config: Config;
+var<uniform> config: OverlayConfig;
 
 struct Frametimes {
     fps: f32,
@@ -106,66 +104,47 @@ let ch_percent = 37;
 
 let FONT_SIZE: f32 = 1.3;
 var<private> TEXT_CURRENT_POS: vec2<f32> = vec2<f32>(0., 0.);
-var<private> TEXT_OUTPUT: f32 = 0.0;
+var<private> TEXT_OUTPUT: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 0.0);
+var<private> ROW_COUNT: f32 = 0.0;
 
 // loosely based on <https://www.shadertoy.com/view/stVBRR>
-fn sdf_texture_char(p: vec2<f32>, c: i32) -> f32 {
-    let char_uv = p / 16. + fract(vec2<f32>(vec2<i32>(c, c / 16)) / 16.);
+fn sdf_texture_char(pos: vec2<f32>, char_id: i32) -> vec4<f32> {
+    let char_uv = pos / 16. + fract(vec2<f32>(f32(char_id), f32(char_id / 16)) / 16.);
     let char_sample = textureSample(font_texture, font_sampler, char_uv);
-    if (p.x < 0.0 || p.x > 1. || p.y < 0.0 || p.y > 1.) {
-        return 0.0;
+    if (pos.x < 0.0 || pos.x > 1. || pos.y < 0.0 || pos.y > 1.) {
+        return vec4<f32>(0.0);
     }
-    return char_sample.x;
+    return char_sample;
 }
 
+// Prints the given character at the current cursor position
 fn print(c: i32) {
     let out = sdf_texture_char(TEXT_CURRENT_POS, c);
     TEXT_CURRENT_POS.x -= .5;
     TEXT_OUTPUT += out;
 }
 
+// Moves the cursor to the next line
 fn newline(uv: vec2<f32>) {
     TEXT_CURRENT_POS.x = (uv.x * 64. / FONT_SIZE);
     TEXT_CURRENT_POS.y -= 1.;
+    ROW_COUNT += 1.0;
 }
 
+// Gets the charcode for the given number
+// Only works with digits, otherwise returns 0
 fn get_digit(in_value: f32) -> i32 {
     var value = floor(in_value);
-    if (value == 0.0) {
-        return ch_0;
-    }
-    if (value == 1.0) {
-        return ch_1;
-    }
-    if (value == 2.0) {
-        return ch_2;
-    }
-    if (value == 3.0) {
-        return ch_3;
-    }
-    if (value == 4.0) {
-        return ch_4;
-    }
-    if (value == 5.0) {
-        return ch_5;
-    }
-    if (value == 6.0) {
-        return ch_6;
-    }
-    if (value == 7.0) {
-        return ch_7;
-    }
-    if (value == 8.0) {
-        return ch_8;
-    }
-    if (value == 9.0) {
-        return ch_9;
+    if (value >= 0.0 && value <= 9.0) {
+        return 48 + i32(value);
     }
     return 0;
 }
 
+// Prints 4 numbers before the decimal point and 2 after
 fn print_number(number: f32) {
-    for (var i = 4; i >= -1; i -= 1) {
+    for (var i = 4; i >= -2; i -= 1) {
+        // get the digit at the current index
         let digit = (number / pow(10., f32(i))) % 10.;
         if (i == -1) {
             // add decimal point
@@ -177,14 +156,12 @@ fn print_number(number: f32) {
     }
 }
 
+// prints u32 values with up to 8 digits
 fn print_u32(in_number: u32) {
     var number = f32(in_number);
     for (var i = 8; i >= 0; i -= 1) {
+        // get the digit at the current index
         let digit = (number / pow(10., f32(i))) % 10.;
-        if (i == -1) {
-            // add decimal point
-            // print(ch_dot);
-        }
         if (abs(number) > pow(10., f32(i))) {
             print(get_digit(digit));
         }
@@ -199,21 +176,23 @@ fn sdf_square(pos: vec2<f32>, half_size: vec2<f32>, offset: vec2<f32>) -> f32 {
     return outside_dist + inside_dist;
 }
 
+// Gets a color based on the delta time
+// The colors are configured using the OverlayConfig
 fn color_from_dt(dt: f32) -> vec4<f32> {
     if (dt < config.dts[0]) {
         return config.colors[0];
     }
-
-    for (var i = 0; i < COLORS_COUNT; i = i + 1) {
+    let colors_count = 4;
+    for (var i = 0; i < colors_count; i = i + 1) {
         if (dt < config.dts[i]) {
             let t = (dt - config.dts[i - 1]) / (config.dts[i] - config.dts[i - 1]);
             return mix(config.colors[i - 1], config.colors[i], t);
         }
     }
-    return config.colors[COLORS_COUNT - 1];
+    return config.colors[colors_count - 1];
 }
 
-fn draw_frametime_graph(uv: vec2<f32>, width: f32, height: f32) -> vec4<f32> {
+fn draw_frametime_graph(uv: vec2<f32>, width: f32, height: f32, offset: f32) -> vec4<f32> {
     // Frametime graph
     let dt_min = config.dt_min;
     let dt_max = config.dt_max;
@@ -222,10 +201,11 @@ fn draw_frametime_graph(uv: vec2<f32>, width: f32, height: f32) -> vec4<f32> {
     let max_width = config.max_width;
 
     // The general alogrithm is highly inspired by
+    // <https://asawicki.info/news_1758_an_idea_for_visualization_of_frame_times>
     // <https://github.com/sawickiap/RegEngine/blob/613c31fd60558a75c5b8902529acfa425fc97b2a/Source/Game.cpp#L331>
 
     let graph_area = vec2<f32>(width, height);
-    let pos_in_area = (uv * vec2<f32>(1.0, -1.0) + graph_area + vec2<f32>(0.0, height * 2.)) / graph_area;
+    let pos_in_area = (uv * vec2<f32>(1.0, -1.0) + graph_area + vec2<f32>(0.0, offset)) / graph_area;
     var graph_width = 0.0;
     for (var i = 0; i <= config.len; i = i + 1) {
         let dt = frametimes.values[i];
@@ -256,6 +236,7 @@ fn vertex(
     @builtin(vertex_index) in_vertex_index: u32,
 ) -> VertexOutput {
     var out: VertexOutput;
+    // fullscreen triangle
     out.uv = vec4<f32>(f32(in_vertex_index & 1u), f32(in_vertex_index >> 1u), 0.5, 0.5) * 4.0 - 1.0;
     return out;
 }
@@ -264,31 +245,32 @@ fn vertex(
 fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let background = vec4<f32>(0.0, 0.0, 0.0, 0.4);
     let area_width = 175.0;
-    let section_height = 50.;
-    let total_area = vec2<f32>(area_width, section_height * 3.);
-    let uv = in.uv.xy / f32(textureDimensions(font_texture).y);
+    let row_height = FONT_SIZE * 16.;
+    let graph_height = row_height;
+    let total_area = vec2<f32>(area_width, row_height * 5.);
+    let font_uv = in.uv.xy / f32(textureDimensions(font_texture).y);
     if (in.uv.x > total_area.x || in.uv.y > total_area.y) {
         discard;
     }
 
-    TEXT_CURRENT_POS = uv * 64. / FONT_SIZE;
+    TEXT_CURRENT_POS = font_uv * 64. / FONT_SIZE;
 
+    // fps
     print_number(frametimes.fps);
     print(ch_space);
     print(ch_f);
     print(ch_p);
     print(ch_s);
+    newline(font_uv);
 
-    newline(uv);
-
-    let ms = frametimes.values[config.len - 1];
-    // return vec4<f32>(ms, 0., 0., 1.0);
-    print_number(ms * 1000.);
+    // frametime in ms
+    let dt = frametimes.values[config.len - 1] * 1000.;
+    print_number(dt);
     print(ch_m);
     print(ch_s);
+    newline(font_uv);
 
-    newline(uv);
-
+    // frame count since start
     print(ch_F);
     print(ch_r);
     print(ch_a);
@@ -297,9 +279,9 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     print(ch_colon);
     print(ch_space);
     print_u32(frametimes.frame_count);
+    newline(font_uv);
 
-    newline(uv);
-
+    // resolution and scale
     print_u32(frametimes.resolution.x);
     print(ch_x);
     print_u32(frametimes.resolution.y);
@@ -308,14 +290,17 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     print_u32(u32(frametimes.scale * 100.));
     print(ch_percent);
     print(ch_rparen);
+    newline(font_uv);
 
-    var graph_color = draw_frametime_graph(in.uv.xy, area_width, section_height);
+    //frametime graph
+    var graph_color = draw_frametime_graph(in.uv.xy, area_width, graph_height, ROW_COUNT * row_height);
     if (any(graph_color != vec4<f32>(0.0))) {
         return graph_color;
     }
+    newline(font_uv);
 
-    if (TEXT_OUTPUT > 0.0) {
-        return vec4<f32>(TEXT_OUTPUT);
+    if (TEXT_OUTPUT.x > 0.0) {
+        return TEXT_OUTPUT.xxxx;
     } else {
         return background;
     }
