@@ -13,7 +13,7 @@ use bevy::{
     },
 };
 
-use crate::{Frametimes, OverlayBindGroups, OverlayConfigUniform};
+use crate::{Frametimes, OverlayBindGroups, OverlayConfigUniform, OverlayDataUniform};
 
 #[derive(Clone, Resource)]
 pub struct OverlayPipeline {
@@ -63,14 +63,18 @@ impl OverlayPipeline {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: buffer.frametimes_buffer.binding().unwrap(),
+                    resource: buffer.data_buffer.binding().unwrap(),
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: buffer.font_image_texture.get_binding(),
+                    resource: buffer.frametimes_buffer.binding().unwrap(),
                 },
                 BindGroupEntry {
                     binding: 3,
+                    resource: buffer.font_image_texture.get_binding(),
+                },
+                BindGroupEntry {
+                    binding: 4,
                     resource: buffer.font_image_sampler.get_binding(),
                 },
             ],
@@ -95,6 +99,16 @@ impl OverlayPipeline {
                     binding: 1,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: Some(OverlayDataUniform::min_size()),
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
                         ty: BufferBindingType::Storage { read_only: true },
                         has_dynamic_offset: false,
                         min_binding_size: Some(Frametimes::min_size()),
@@ -102,7 +116,7 @@ impl OverlayPipeline {
                     count: None,
                 },
                 BindGroupLayoutEntry {
-                    binding: 2,
+                    binding: 3,
                     count: None,
                     ty: BindingType::Texture {
                         sample_type: TextureSampleType::Float { filterable: true },
@@ -112,7 +126,7 @@ impl OverlayPipeline {
                     visibility: ShaderStages::FRAGMENT,
                 },
                 BindGroupLayoutEntry {
-                    binding: 3,
+                    binding: 4,
                     count: None,
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     visibility: ShaderStages::FRAGMENT,

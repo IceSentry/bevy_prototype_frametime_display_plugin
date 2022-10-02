@@ -103,6 +103,7 @@ impl Plugin for OverlayPlugin {
 
         render_app
             .init_resource::<OverlayConfig>()
+            .init_resource::<OverlayDataUniform>()
             .init_resource::<Frametimes>()
             .init_resource::<OverlayBindGroups>()
             .init_resource::<OverlayPipeline>()
@@ -165,9 +166,49 @@ impl OverlayConfigUniform {
     }
 }
 
+#[derive(Debug, Clone, ShaderType, Resource)]
+pub struct OverlayDataUniform {
+    pub fps: f32,
+    pub frame_count: u32,
+    pub resolution: UVec2,
+    pub scale: f32,
+}
+
+impl Default for OverlayDataUniform {
+    fn default() -> Self {
+        Self {
+            fps: 0.0,
+            frame_count: 0,
+            resolution: UVec2::ZERO,
+            scale: 1.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, ShaderType, Resource)]
+pub struct Frametimes {
+    pub values: [f32; FRAMETIME_BUFFER_LEN],
+}
+
+impl Default for Frametimes {
+    fn default() -> Self {
+        Self {
+            values: [0.0; FRAMETIME_BUFFER_LEN],
+        }
+    }
+}
+
+impl Frametimes {
+    pub fn push(&mut self, value: f32) {
+        self.values.rotate_left(1);
+        self.values[FRAMETIME_BUFFER_LEN - 1] = value;
+    }
+}
+
 #[derive(Resource)]
 pub struct OverlayBindGroups {
     pub config_buffer: UniformBuffer<OverlayConfigUniform>,
+    pub data_buffer: UniformBuffer<OverlayDataUniform>,
     pub frametimes_buffer: StorageBuffer<Frametimes>,
     pub font_image_texture: OwnedBindingResource,
     pub font_image_sampler: OwnedBindingResource,
@@ -178,6 +219,7 @@ impl FromWorld for OverlayBindGroups {
         let render_device = world.resource::<RenderDevice>();
         let render_queue = world.resource::<RenderQueue>();
         let config = world.resource::<OverlayConfig>();
+        let data = world.resource::<OverlayDataUniform>();
         let frametimes = world.resource::<Frametimes>();
         let fallback_image = world.resource::<FallbackImage>();
 
@@ -189,6 +231,10 @@ impl FromWorld for OverlayBindGroups {
         ));
         config_buffer.write_buffer(render_device, render_queue);
 
+        let mut data_buffer = UniformBuffer::default();
+        data_buffer.set(data.clone());
+        data_buffer.write_buffer(render_device, render_queue);
+
         let mut frametimes_buffer = StorageBuffer::default();
         frametimes_buffer.set(frametimes.clone());
         frametimes_buffer.write_buffer(render_device, render_queue);
@@ -199,6 +245,7 @@ impl FromWorld for OverlayBindGroups {
 
         OverlayBindGroups {
             config_buffer,
+            data_buffer,
             frametimes_buffer,
             font_image_texture,
             font_image_sampler,
@@ -210,34 +257,6 @@ impl OverlayBindGroups {
     fn update_font_image(&mut self, image: &GpuImage) {
         self.font_image_texture = OwnedBindingResource::TextureView(image.texture_view.clone());
         self.font_image_sampler = OwnedBindingResource::Sampler(image.sampler.clone());
-    }
-}
-
-#[derive(Debug, Clone, ShaderType, Resource)]
-pub struct Frametimes {
-    pub fps: f32,
-    pub frame_count: u32,
-    pub resolution: UVec2,
-    pub scale: f32,
-    pub values: [f32; FRAMETIME_BUFFER_LEN],
-}
-
-impl Default for Frametimes {
-    fn default() -> Self {
-        Self {
-            fps: 0.0,
-            frame_count: 0,
-            resolution: UVec2::ZERO,
-            scale: 1.0,
-            values: [0.0; FRAMETIME_BUFFER_LEN],
-        }
-    }
-}
-
-impl Frametimes {
-    pub fn push(&mut self, value: f32) {
-        self.values.rotate_left(1);
-        self.values[FRAMETIME_BUFFER_LEN - 1] = value;
     }
 }
 
@@ -255,6 +274,7 @@ fn extract_overlay_camera(
 fn update_frametimes(
     diagnostics: Extract<Res<Diagnostics>>,
     mut frametimes: ResMut<Frametimes>,
+    mut overlay_data: ResMut<OverlayDataUniform>,
     frame_count: Extract<Res<FrameCount>>,
     windows: Extract<Res<Windows>>,
 ) {
@@ -266,15 +286,15 @@ fn update_frametimes(
 
     if let Some(fps_diagnostic) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
         if let Some(fps) = fps_diagnostic.value() {
-            frametimes.fps = fps as f32;
+            overlay_data.fps = fps as f32;
         }
     }
 
-    frametimes.frame_count = frame_count.0;
+    overlay_data.frame_count = frame_count.0;
     if let Some(window) = windows.get_primary() {
-        frametimes.resolution.x = window.physical_width();
-        frametimes.resolution.y = window.physical_height();
-        frametimes.scale = window.scale_factor() as f32;
+        overlay_data.resolution.x = window.physical_width();
+        overlay_data.resolution.y = window.physical_height();
+        overlay_data.scale = window.scale_factor() as f32;
     }
 }
 
@@ -285,6 +305,7 @@ fn extract_font_handle(mut commands: Commands, font_image: Extract<Res<FontImage
 fn prepare_overlay_bind_group(
     mut bind_group: ResMut<OverlayBindGroups>,
     mut pipeline: ResMut<OverlayPipeline>,
+    data_uniform: Res<OverlayDataUniform>,
     frametimes: Res<Frametimes>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
@@ -297,6 +318,13 @@ fn prepare_overlay_bind_group(
         bind_group
             .frametimes_buffer
             .write_buffer(&render_device, &render_queue);
+    }
+
+    if data_uniform.is_changed() {
+        bind_group.data_buffer.set(data_uniform.clone());
+        bind_group
+            .data_buffer
+            .write_buffer(&render_device, &render_queue)
     }
 
     if !*font_loaded {

@@ -11,19 +11,24 @@ struct OverlayConfig {
 @group(0) @binding(0)
 var<uniform> config: OverlayConfig;
 
-struct Frametimes {
+struct OverlayData {
     fps: f32,
     frame_count: u32,
     resolution: vec2<u32>,
     scale: f32,
-    values: array<f32>,
 }
 @group(0) @binding(1)
+var<uniform> data: OverlayData;
+
+struct Frametimes {
+    values: array<f32>,
+}
+@group(0) @binding(2)
 var<storage> frametimes: Frametimes;
 
-@group(0) @binding(2)
-var font_texture: texture_2d<f32>;
 @group(0) @binding(3)
+var font_texture: texture_2d<f32>;
+@group(0) @binding(4)
 var font_sampler: sampler;
 
 // numbers
@@ -256,7 +261,7 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     TEXT_CURRENT_POS = font_uv * 64. / FONT_SIZE;
 
     // fps
-    print_number(frametimes.fps);
+    print_number(data.fps);
     print(ch_space);
     print(ch_f);
     print(ch_p);
@@ -278,16 +283,16 @@ fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     print(ch_e);
     print(ch_colon);
     print(ch_space);
-    print_u32(frametimes.frame_count);
+    print_u32(data.frame_count);
     newline(font_uv);
 
     // resolution and scale
-    print_u32(frametimes.resolution.x);
+    print_u32(data.resolution.x);
     print(ch_x);
-    print_u32(frametimes.resolution.y);
+    print_u32(data.resolution.y);
     print(ch_space);
     print(ch_lparen);
-    print_u32(u32(frametimes.scale * 100.));
+    print_u32(u32(data.scale * 100.));
     print(ch_percent);
     print(ch_rparen);
     newline(font_uv);
